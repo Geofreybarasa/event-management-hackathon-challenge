@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EventFlow — Events Management</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo">
+    <h1>Event<span>Flow</span></h1>
+    <p>Management System</p>
+  </div>
+  <nav class="nav">
+    <div class="nav-item active" onclick="navigate('dashboard')">
+      <span class="icon">⬛</span> Dashboard
+    </div>
+    <div class="nav-item" onclick="navigate('events')">
+      <span class="icon">📅</span> Events
+    </div>
+    <div class="nav-item" onclick="navigate('attendees')">
+      <span class="icon">👥</span> Attendees
+    </div>
+    <div class="nav-item" onclick="navigate('budget')">
+      <span class="icon">💰</span> Budget
+    </div>
+    <div class="nav-item" onclick="navigate('feedback')">
+      <span class="icon">⭐</span> Feedback
+    </div>
+    <div class="nav-item" onclick="navigate('analytics')">
+      <span class="icon">📊</span> Analytics
+    </div>
+  </nav>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <h2 id="page-title">Dashboard</h2>
+    <div class="topbar-actions">
+      <div class="connection-status">
+        <div class="dot" id="conn-dot"></div>
+        <span id="conn-text">Connected</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="topbar-actions">
+  <div class="connection-status">
+    <div class="dot" id="conn-dot"></div>
+    <span id="conn-text">Connected</span>
+  </div>
+  <!-- ADD THIS -->
+  <a href="/scanner.html" target="_blank" class="btn btn-primary" 
+     style="text-decoration:none; font-size:13px">
+    📷 Open Scanner
+  </a>
+</div>
+
+  <!-- ① DASHBOARD PAGE -->
+  <div class="page active" id="page-dashboard">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Events</div>
+        <div class="stat-value purple" id="stat-events">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Attendees</div>
+        <div class="stat-value green" id="stat-attendees">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Checked In</div>
+        <div class="stat-value pink" id="stat-checkedin">—</div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">Recent Events</div>
+        <button class="btn btn-primary" onclick="navigate('events')">View All</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Event</th>
+            <th>Type</th>
+            <th>Date</th>
+            <th>Location</th>
+            <th>Budget</th>
+          </tr>
+        </thead>
+        <tbody id="dashboard-events-list">
+          <tr><td colspan="5"><div class="empty"><div class="loading"></div></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <!-- END ① DASHBOARD -->
+
+  <!-- ② EVENTS PAGE -->
+  <div class="page" id="page-events">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">All Events</div>
+        <button class="btn btn-primary" onclick="openModal('modal-create-event')">+ New Event</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Event Name</th>
+            <th>Type</th>
+            <th>Date</th>
+            <th>Location</th>
+            <th>Budget</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="events-list">
+          <tr><td colspan="6"><div class="empty"><div class="loading"></div></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <!-- END ② EVENTS -->
+
+  <!-- ③ ATTENDEES PAGE -->
+  <div class="page" id="page-attendees">
+    <div class="section" style="margin-bottom:16px">
+      <div class="section-header">
+        <div class="section-title">Filter by Event</div>
+      </div>
+      <div style="padding:16px 24px; display:flex; gap:12px; align-items:center;">
+        <select id="attendee-event-select" style="flex:1; max-width:300px" onchange="loadAttendees()">
+          <option value="">Select an event...</option>
+        </select>
+        <button class="btn btn-primary" onclick="openRegisterModal()">+ Register Attendee</button>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">Attendees</div>
+        <div style="display:flex;gap:16px;font-size:13px;color:var(--muted)">
+          <span>Registered: <strong id="att-registered" style="color:var(--text)">0</strong></span>
+          <span>Checked In: <strong id="att-checkedin" style="color:var(--accent3)">0</strong></span>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="attendees-list">
+          <tr><td colspan="4">
+            <div class="empty">
+              <div class="empty-icon">👥</div>
+              <p>Select an event to view attendees</p>
+            </div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <!-- END ③ ATTENDEES -->
+
+  <!-- ④ BUDGET PAGE -->
+  <div class="page" id="page-budget">
+    <div class="section" style="margin-bottom:16px">
+      <div class="section-header">
+        <div class="section-title">Select Event</div>
+      </div>
+      <div style="padding:16px 24px; display:flex; gap:12px; align-items:center;">
+        <select id="budget-event-select" style="flex:1; max-width:300px" onchange="loadBudget()">
+          <option value="">Select an event...</option>
+        </select>
+        <button class="btn btn-primary" onclick="openAddBudgetModal()">+ Add Budget Item</button>
+      </div>
+    </div>
+    <div class="stats-grid" id="budget-summary" style="display:none">
+      <div class="stat-card">
+        <div class="stat-label">Total Planned</div>
+        <div class="stat-value purple" id="b-planned">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Actual</div>
+        <div class="stat-value green" id="b-actual">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Remaining</div>
+        <div class="stat-value pink" id="b-diff">0</div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">Budget Items</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Description</th>
+            <th>Planned (KES)</th>
+            <th>Actual (KES)</th>
+            <th>Progress</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="budget-list">
+          <tr><td colspan="6">
+            <div class="empty">
+              <div class="empty-icon">💰</div>
+              <p>Select an event to view budget</p>
+            </div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <!-- END ④ BUDGET -->
+
+  <!-- ⑤ FEEDBACK PAGE -->
+  <div class="page" id="page-feedback">
+    <div class="section" style="margin-bottom:16px">
+      <div class="section-header">
+        <div class="section-title">Select Event</div>
+      </div>
+      <div style="padding:16px 24px; display:flex; gap:12px; align-items:center;">
+        <select id="feedback-event-select" style="flex:1; max-width:300px" onchange="loadFeedback()">
+          <option value="">Select an event...</option>
+        </select>
+        <button class="btn btn-primary" onclick="openFeedbackModal()">+ Submit Feedback</button>
+      </div>
+    </div>
+    <div class="stats-grid" id="feedback-summary" style="display:none; margin-bottom:24px">
+      <div class="stat-card">
+        <div class="stat-label">Total Responses</div>
+        <div class="stat-value purple" id="fb-total">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Average Rating</div>
+        <div class="stat-value green" id="fb-avg">0.0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Rating Breakdown</div>
+        <div id="fb-stars" style="display:flex; gap:4px; align-items:center; margin-top:8px"></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">Feedback Responses</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Attendee</th>
+            <th>Title</th>
+            <th>Comment</th>
+            <th>Rating</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody id="feedback-list">
+          <tr>
+            <td colspan="5">
+              <div class="empty">
+                <div class="empty-icon">⭐</div>
+                <p>Select an event to view feedback</p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <!-- END ⑤ FEEDBACK -->
+
+  <!-- ⑥ ANALYTICS PAGE -->
+  <div class="page" id="page-analytics">
+    <div class="stats-grid" style="margin-bottom:24px">
+      <div class="stat-card">
+        <div class="stat-label">Total Events</div>
+        <div class="stat-value purple" id="an-events">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Attendees</div>
+        <div class="stat-value green" id="an-attendees">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Overall Avg Rating</div>
+        <div class="stat-value pink" id="an-rating">—</div>
+      </div>
+    </div>
+    <div id="best-event-banner" style="display:none; margin-bottom:24px">
+      <div class="section" style="border-color:rgba(108,99,255,0.4); background:rgba(108,99,255,0.05)">
+        <div class="section-header">
+          <div class="section-title">🏆 Best Performing Event</div>
+        </div>
+        <div style="padding:16px 24px; display:flex; gap:32px; align-items:center; flex-wrap:wrap">
+          <div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Event</div>
+            <div style="font-size:18px;font-weight:700;font-family:var(--font-display)" id="best-name">—</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Performance Score</div>
+            <div style="font-size:18px;font-weight:700;color:var(--accent)" id="best-score">—</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Attendance Rate</div>
+            <div style="font-size:18px;font-weight:700;color:var(--accent3)" id="best-attendance">—</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Avg Rating</div>
+            <div style="font-size:18px;font-weight:700;color:var(--accent2)" id="best-rating">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">Event Performance Breakdown</div>
+        <button class="btn btn-ghost" onclick="loadAnalytics()">↻ Refresh</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Event</th>
+            <th>Type</th>
+            <th>Attendance Rate</th>
+            <th>Budget Usage</th>
+            <th>Avg Rating</th>
+            <th>Performance</th>
+          </tr>
+        </thead>
+        <tbody id="analytics-list">
+          <tr>
+            <td colspan="6">
+              <div class="empty"><div class="loading"></div></div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="event-detail-cards" style="margin-top:24px"></div>
+  </div>
+  <!-- END ⑥ ANALYTICS -->
+
+</main>
+<!-- END MAIN -->
+
+<!-- ══════════ MODALS ══════════ -->
+
+<!-- Create Event Modal -->
+<div class="modal-overlay" id="modal-create-event">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Create New Event</div>
+      <button class="modal-close" onclick="closeModal('modal-create-event')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Event Name *</label>
+        <input type="text" id="ev-name" placeholder="e.g. Tech Summit 2026"/>
+      </div>
+      <div class="form-group">
+        <label>Type *</label>
+        <select id="ev-type">
+          <option value="External">External</option>
+          <option value="Internal">Internal</option>
+          <option value="Marketing">Marketing</option>
+          <option value="Technical">Technical</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Date *</label>
+        <input type="date" id="ev-date"/>
+      </div>
+      <div class="form-group">
+        <label>Location</label>
+        <input type="text" id="ev-location" placeholder="e.g. Nairobi"/>
+      </div>
+      <div class="form-group">
+        <label>Planned Budget (KES)</label>
+        <input type="number" id="ev-budget" placeholder="e.g. 50000" min="0"/>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="submitNewEvent()">Create Event</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-create-event')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Register Attendee Modal -->
+<div class="modal-overlay" id="modal-register-attendee">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Register Attendee</div>
+      <button class="modal-close" onclick="closeModal('modal-register-attendee')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Event *</label>
+        <select id="reg-event-id"></select>
+      </div>
+      <div class="form-group">
+        <label>Full Name *</label>
+        <input type="text" id="reg-name" placeholder="John Doe"/>
+      </div>
+      <div class="form-group">
+        <label>Email *</label>
+        <input type="email" id="reg-email" placeholder="john@example.com"/>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="registerAttendee()">Register</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-register-attendee')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Budget Item Modal -->
+<div class="modal-overlay" id="modal-add-budget">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Add Budget Item</div>
+      <button class="modal-close" onclick="closeModal('modal-add-budget')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Category *</label>
+        <input type="text" id="bud-category" placeholder="e.g. Catering"/>
+      </div>
+      <div class="form-group">
+        <label>Planned Amount (KES) *</label>
+        <input type="number" id="bud-planned" placeholder="e.g. 15000" min="1"/>
+      </div>
+      <div class="form-group full">
+        <label>Description</label>
+        <textarea id="bud-desc" placeholder="Details about this expense..."></textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="addBudgetItem()">Add Item</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-budget')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Update Actual Amount Modal -->
+<div class="modal-overlay" id="modal-update-actual">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Update Actual Amount</div>
+      <button class="modal-close" onclick="closeModal('modal-update-actual')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Actual Amount Spent (KES) *</label>
+        <input type="number" id="actual-amount" placeholder="e.g. 12000" min="0"/>
+        <input type="hidden" id="actual-budget-id"/>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="updateActualAmount()">Update</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-update-actual')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Submit Feedback Modal -->
+<div class="modal-overlay" id="modal-submit-feedback">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Submit Feedback</div>
+      <button class="modal-close" onclick="closeModal('modal-submit-feedback')">✕</button>
+    </div>
+    <div class="form-grid">
+      <input type="hidden" id="fb-event-id"/>
+      <div class="form-group full">
+        <label>Your Name *</label>
+        <input type="text" id="fb-name" placeholder="e.g. John Doe"/>
+      </div>
+      <div class="form-group full">
+        <label>Title</label>
+        <input type="text" id="fb-title" placeholder="e.g. Great event!"/>
+      </div>
+      <div class="form-group full">
+        <label>Your Feedback *</label>
+        <textarea id="fb-body" placeholder="Share your experience about this event..."></textarea>
+      </div>
+      <div class="form-group full">
+        <label>Rating * (1 = Poor, 5 = Excellent)</label>
+        <div id="star-picker" style="display:flex; gap:8px; margin-top:4px">
+          <span class="star-btn" data-val="1" onclick="selectRating(1)" style="font-size:28px; cursor:pointer; opacity:0.3; transition:all 0.2s">★</span>
+          <span class="star-btn" data-val="2" onclick="selectRating(2)" style="font-size:28px; cursor:pointer; opacity:0.3; transition:all 0.2s">★</span>
+          <span class="star-btn" data-val="3" onclick="selectRating(3)" style="font-size:28px; cursor:pointer; opacity:0.3; transition:all 0.2s">★</span>
+          <span class="star-btn" data-val="4" onclick="selectRating(4)" style="font-size:28px; cursor:pointer; opacity:0.3; transition:all 0.2s">★</span>
+          <span class="star-btn" data-val="5" onclick="selectRating(5)" style="font-size:28px; cursor:pointer; opacity:0.3; transition:all 0.2s">★</span>
+        </div>
+        <input type="hidden" id="fb-rating" value=""/>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="submitFeedbackForm()">Submit Feedback</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-submit-feedback')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Event Modal -->
+<div class="modal-overlay" id="modal-edit-event">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Edit Event</div>
+      <button class="modal-close" onclick="closeModal('modal-edit-event')">✕</button>
+    </div>
+    <div class="form-grid">
+      <input type="hidden" id="edit-ev-id"/>
+      <div class="form-group full">
+        <label>Event Name *</label>
+        <input type="text" id="edit-ev-name" placeholder="e.g. Tech Summit 2026"/>
+      </div>
+      <div class="form-group">
+        <label>Type *</label>
+        <select id="edit-ev-type">
+          <option value="External">External</option>
+          <option value="Internal">Internal</option>
+          <option value="Marketing">Marketing</option>
+          <option value="Technical">Technical</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Date *</label>
+        <input type="date" id="edit-ev-date"/>
+      </div>
+      <div class="form-group">
+        <label>Location</label>
+        <input type="text" id="edit-ev-location" placeholder="e.g. Nairobi"/>
+      </div>
+      <div class="form-group">
+        <label>Planned Budget (KES)</label>
+        <input type="number" id="edit-ev-budget" placeholder="e.g. 50000" min="0"/>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="submitUpdateEvent()">Save Changes</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-event')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
