@@ -18,9 +18,16 @@ const io = socketio(server, {
   cors: { origin: "*" }
 });
 
+
+
 // Middleware
 app.use(cors());
 app.use(express.json()); // lets us read JSON from requests
+
+// Serve registration page
+app.get('/register/:token', (req, res) => {
+  res.sendFile('register.html', { root: './public' });
+});
 
 // Routes
 const eventRoutes = require('./routes/events');
@@ -28,12 +35,14 @@ const attendeeRoutes = require('./routes/attendees');
 const budgetRoutes = require('./routes/budget');
 const feedbackRoutes = require('./routes/feedback');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const registrationRoutes = require('./routes/registration');
 
 app.use('/api/events', eventRoutes);
 app.use('/api/attendees', attendeeRoutes);
 app.use('/api/budget', budgetRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/register', registrationRoutes);
 
 // Socket.io - real time connection
 io.on('connection', (socket) => {

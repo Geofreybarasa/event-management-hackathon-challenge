@@ -127,6 +127,7 @@ async function loadEvents() {
             <div class="actions">
               <button class="btn btn-ghost" onclick="openEditModal(${ev.id}, '${ev.name}', '${ev.type}', '${ev.date.split('T')[0]}', '${ev.location || ''}', ${ev.planned_budget || 0})">Edit</button>
               <button class="btn btn-danger" onclick="deleteEvent(${ev.id})">Delete</button>
+              <button class="btn btn-ghost" onclick="copyRegLink('${ev.registration_token}')">🔗 Copy Link</button>
             </div>
           </td>
         </tr>`;
@@ -713,6 +714,12 @@ function renderDetailCards(events) {
   }
 
   container.appendChild(grid);
+}
+
+function copyRegLink(token) {
+  const link = `${window.location.origin}/register/${token}`;
+  navigator.clipboard.writeText(link);
+  toast('Registration link copied! 🔗');
 }
 
 // ── INIT ──

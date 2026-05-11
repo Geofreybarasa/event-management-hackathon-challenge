@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const crypto = require('crypto');
 
 // Create a new event
 // validation already handled by validateEvent middleware
@@ -6,19 +7,19 @@ const createEvent = async (req, res) => {
   try {
     const { name, type, date, location, planned_budget } = req.body;
 
-    // Save to database
+    // generate unique token for self registration link
+    const registration_token = crypto.randomUUID();
+
     const [result] = await db.query(
-      'INSERT INTO events (name, type, date, location, planned_budget) VALUES (?, ?, ?, ?, ?)',
-      [name, type, date, location, planned_budget]
+      'INSERT INTO events (name, type, date, location, planned_budget, registration_token) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, type, date, location, planned_budget, registration_token]
     );
 
-    // Get the newly created event
     const [newEvent] = await db.query(
       'SELECT * FROM events WHERE id = ?',
       [result.insertId]
     );
 
-    // Emit real-time update to all connected clients
     const io = req.app.get('io');
     io.emit('eventCreated', newEvent[0]);
 

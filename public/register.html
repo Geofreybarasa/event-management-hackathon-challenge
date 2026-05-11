@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EventFlow — Register for Event</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --surface2: #1c1c27;
+      --border: #2a2a3a;
+      --accent: #6c63ff;
+      --accent3: #43e97b;
+      --text: #f0f0f8;
+      --muted: #7a7a9a;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(108,99,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(108,99,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── LOADING STATE ── */
+    .loading-state {
+      text-align: center;
+      padding: 60px 0;
+    }
+
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── ERROR STATE ── */
+    .error-state {
+      text-align: center;
+      padding: 60px 24px;
+      display: none;
+    }
+
+    .error-icon { font-size: 64px; margin-bottom: 16px; }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      display: none;
+    }
+
+    /* ── CARD HEADER ── */
+    .card-header {
+      background: linear-gradient(135deg, #6c63ff, #9c8fff);
+      padding: 32px;
+      text-align: center;
+    }
+
+    .event-logo {
+      font-family: 'Syne', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 16px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .event-name {
+      font-family: 'Syne', sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      color: white;
+      line-height: 1.2;
+      margin-bottom: 8px;
+    }
+
+    .event-type {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* ── EVENT DETAILS ── */
+    .event-details {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .detail-item {
+      flex: 1;
+      padding: 16px 20px;
+      text-align: center;
+      border-right: 1px solid var(--border);
+    }
+
+    .detail-item:last-child { border-right: none; }
+
+    .detail-icon { font-size: 20px; margin-bottom: 4px; }
+
+    .detail-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+
+    .detail-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    /* ── FORM ── */
+    .form-section {
+      padding: 32px;
+    }
+
+    .form-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .form-subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(108,99,255,0.1);
+    }
+
+    input::placeholder { color: var(--muted); }
+
+    .submit-btn {
+      width: 100%;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .submit-btn:hover { background: #5a52e0; transform: translateY(-1px); }
+    .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    .btn-spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: none;
+    }
+
+    /* ── ERROR MESSAGE ── */
+    .error-msg {
+      background: rgba(255,101,132,0.1);
+      border: 1px solid rgba(255,101,132,0.3);
+      color: #ff6584;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    /* ── SUCCESS STATE ── */
+    .success-state {
+      padding: 48px 32px;
+      text-align: center;
+      display: none;
+    }
+
+    .success-icon {
+      width: 80px; height: 80px;
+      background: rgba(67,233,123,0.15);
+      border: 2px solid rgba(67,233,123,0.4);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      margin: 0 auto 20px;
+      animation: popIn 0.5s ease;
+    }
+
+    @keyframes popIn {
+      0% { transform: scale(0); opacity: 0; }
+      70% { transform: scale(1.1); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .success-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      color: var(--accent3);
+    }
+
+    .success-msg {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .success-email-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+
+    .success-email-box p {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .success-email-box strong {
+      font-size: 15px;
+      color: var(--text);
+    }
+
+    .instructions-box {
+      background: rgba(108,99,255,0.08);
+      border: 1px solid rgba(108,99,255,0.2);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: left;
+    }
+
+    .instructions-box h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .instructions-box ol {
+      padding-left: 20px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 2;
+    }
+
+    /* ── FOOTER ── */
+    .card-footer {
+      padding: 16px 32px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- LOADING STATE -->
+  <div class="loading-state" id="loading-state">
+    <div class="spinner"></div>
+    <p style="color:var(--muted)">Loading event details...</p>
+  </div>
+
+  <!-- ERROR STATE -->
+  <div class="error-state" id="error-state">
+    <div class="error-icon">❌</div>
+    <h2 style="font-family:'Syne',sans-serif;margin-bottom:8px">Invalid Link</h2>
+    <p style="color:var(--muted);font-size:14px">
+      This registration link is invalid or has expired.
+      Please contact the event organizer for a valid link.
+    </p>
+  </div>
+
+  <!-- REGISTRATION CARD -->
+  <div class="card" id="registration-card">
+
+    <!-- Header with event info -->
+    <div class="card-header">
+      <div class="event-logo">EventFlow</div>
+      <div class="event-name" id="event-name">Loading...</div>
+      <div class="event-type" id="event-type">Event</div>
+    </div>
+
+    <!-- Event details row -->
+    <div class="event-details">
+      <div class="detail-item">
+        <div class="detail-icon">📅</div>
+        <div class="detail-label">Date</div>
+        <div class="detail-value" id="event-date">—</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-icon">📍</div>
+        <div class="detail-label">Location</div>
+        <div class="detail-value" id="event-location">—</div>
+      </div>
+    </div>
+
+    <!-- Registration Form -->
+    <div class="form-section" id="form-section">
+      <div class="form-title">Register for this Event</div>
+      <div class="form-subtitle">
+        Fill in your details below. You will receive a confirmation 
+        email with your QR code for entry.
+      </div>
+
+      <!-- Error message -->
+      <div class="error-msg" id="error-msg"></div>
+
+      <!-- Form -->
+      <div class="form-group">
+        <label>Full Name *</label>
+        <input 
+          type="text" 
+          id="reg-name" 
+          placeholder="e.g. John Doe"
+          autocomplete="name"
+        />
+      </div>
+
+      <div class="form-group">
+        <label>Email Address *</label>
+        <input 
+          type="email" 
+          id="reg-email" 
+          placeholder="e.g. john@example.com"
+          autocomplete="email"
+        />
+      </div>
+
+      <button class="submit-btn" id="submit-btn" onclick="submitRegistration()">
+        <div class="btn-spinner" id="btn-spinner"></div>
+        <span id="btn-text">Register Now →</span>
+      </button>
+    </div>
+
+    <!-- Success State (shown after registration) -->
+    <div class="success-state" id="success-state">
+      <div class="success-icon">✅</div>
+      <div class="success-title">You're Registered!</div>
+      <div class="success-msg">
+        Your registration was successful. 
+        Check your email for your QR code entry pass.
+      </div>
+
+      <div class="success-email-box">
+        <p>QR code sent to:</p>
+        <strong id="success-email">—</strong>
+      </div>
+
+      <div class="instructions-box">
+        <h4>📋 What to do next</h4>
+        <ol>
+          <li>Check your email inbox</li>
+          <li>Save the QR code image</li>
+          <li>Arrive at the venue on time</li>
+          <li>Show QR code at the entrance</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="card-footer">
+      Powered by <strong>EventFlow</strong> · Registration System
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  // Get token from URL
+  // URL looks like: /register/abc-123-def
+  const token = window.location.pathname.split('/register/')[1];
+
+  let eventData = null;
+
+  // ── LOAD EVENT DETAILS ──
+  async function loadEvent() {
+    if (!token) {
+      showError();
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/register/${token}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError();
+        return;
+      }
+
+      eventData = data.event;
+      renderEvent(eventData);
+
+    } catch(e) {
+      showError();
+    }
+  }
+
+  // ── RENDER EVENT DETAILS ──
+  function renderEvent(ev) {
+    document.getElementById('loading-state').style.display = 'none';
+    document.getElementById('registration-card').style.display = 'block';
+
+    document.getElementById('event-name').textContent = ev.name;
+    document.getElementById('event-type').textContent = ev.type || 'Event';
+    document.getElementById('event-location').textContent = ev.location || 'TBA';
+    document.getElementById('event-date').textContent = new Date(ev.date).toLocaleDateString('en-KE', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+
+    // update page title
+    document.title = `Register for ${ev.name}`;
+  }
+
+  // ── SHOW ERROR ──
+  function showError() {
+    document.getElementById('loading-state').style.display = 'none';
+    document.getElementById('error-state').style.display = 'block';
+  }
+
+  // ── SUBMIT REGISTRATION ──
+  async function submitRegistration() {
+    const name = document.getElementById('reg-name').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const errorMsg = document.getElementById('error-msg');
+
+    // hide previous errors
+    errorMsg.style.display = 'none';
+
+    // validate
+    if (!name) {
+      errorMsg.textContent = 'Please enter your full name';
+      errorMsg.style.display = 'block';
+      document.getElementById('reg-name').focus();
+      return;
+    }
+
+    if (!email) {
+      errorMsg.textContent = 'Please enter your email address';
+      errorMsg.style.display = 'block';
+      document.getElementById('reg-email').focus();
+      return;
+    }
+
+    // show loading state on button
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    document.getElementById('btn-spinner').style.display = 'block';
+    document.getElementById('btn-text').textContent = 'Registering...';
+
+    try {
+      const res = await fetch(`/api/register/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        // show error
+        errorMsg.textContent = data.message || 'Registration failed. Please try again.';
+        errorMsg.style.display = 'block';
+
+        // reset button
+        btn.disabled = false;
+        document.getElementById('btn-spinner').style.display = 'none';
+        document.getElementById('btn-text').textContent = 'Register Now →';
+        return;
+      }
+
+      // success — show success state
+      showSuccess(email);
+
+    } catch(e) {
+      errorMsg.textContent = 'Connection error. Please check your internet and try again.';
+      errorMsg.style.display = 'block';
+      btn.disabled = false;
+      document.getElementById('btn-spinner').style.display = 'none';
+      document.getElementById('btn-text').textContent = 'Register Now →';
+    }
+  }
+
+  // ── SHOW SUCCESS ──
+  function showSuccess(email) {
+    document.getElementById('form-section').style.display = 'none';
+    document.getElementById('success-state').style.display = 'block';
+    document.getElementById('success-email').textContent = email;
+  }
+
+  // ── ENTER KEY SUPPORT ──
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitRegistration();
+  });
+
+  // ── INIT ──
+  loadEvent();
+</script>
+</body>
+</html>
