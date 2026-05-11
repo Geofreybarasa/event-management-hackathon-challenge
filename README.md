@@ -123,7 +123,7 @@ Whenever you need a new feature, ask yourself these questions:
 5. What SQL query do I need?
 6. What do I send back?
 
-Your MVP = 3-4 working features:
+My MVP = 3-4 working features:
 1. Create & View Events
 A form where someone fills in event name, type, date, budget, location
 A dashboard that lists all events in one place
@@ -142,7 +142,7 @@ Simple visual showing if you're over or under budget
 A simple form attendees fill after the event
 Results show up on a dashboard
 
-What your demo flow looks like:
+What the demo flow looks like:
 Create an event
 Register some attendees
 Check them in
