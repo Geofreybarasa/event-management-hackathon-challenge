@@ -1,70 +1,164 @@
-//Here is what is done in this file...it is an entry point
-//  1. Creates the express app
-// 2. Connects socket.io
-// 3. Registers middleware globally (cors, express.json)
-// 4. Registers all routes
-// 5. Starts the server on a port
+require('dotenv').config();
+
 const express = require('express');
 const http = require('http');
 const socketio = require('socket.io');
 const cors = require('cors');
-require('dotenv').config();
-const db = require('./config/db');
 const path = require('path');
+
+const db = require('./config/db');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketio(server, {
-  cors: { origin: "*" }
-});
+const io = socketio(server, { cors: { origin: "*" } });
 
-
-
-// Middleware
+/*
+|--------------------------------------------------------------------------
+| MIDDLEWARE
+|--------------------------------------------------------------------------
+*/
 app.use(cors());
-app.use(express.json()); // lets us read JSON from requests
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Serve registration page
+/*
+|--------------------------------------------------------------------------
+| MAKE SOCKET AVAILABLE
+|--------------------------------------------------------------------------
+*/
+app.set('io', io);
+
+/*
+|--------------------------------------------------------------------------
+| STATIC FILES — must come before routes that serve HTML
+|--------------------------------------------------------------------------
+*/
+app.use(express.static(path.join(__dirname, 'public')));
+
+/*
+|--------------------------------------------------------------------------
+| REGISTRATION PAGE
+|--------------------------------------------------------------------------
+*/
 app.get('/register/:token', (req, res) => {
-  res.sendFile('register.html', { root: './public' });
+  res.sendFile(path.join(__dirname, 'public', 'register.html'));
 });
 
-// Routes
-const eventRoutes = require('./routes/events');
-const attendeeRoutes = require('./routes/attendees');
-const budgetRoutes = require('./routes/budget');
-const feedbackRoutes = require('./routes/feedback');
-const analyticsRoutes = require('./routes/analyticsRoutes');
+/*
+|--------------------------------------------------------------------------
+| API ROUTES
+|--------------------------------------------------------------------------
+*/
+const eventRoutes        = require('./routes/events');
+const attendeeRoutes     = require('./routes/attendees');
+const budgetRoutes       = require('./routes/budget');
+const feedbackRoutes     = require('./routes/feedback');
+const analyticsRoutes    = require('./routes/analyticsRoutes');
 const registrationRoutes = require('./routes/registration');
+const scanRoutes         = require('./routes/scan');
 
-app.use('/api/events', eventRoutes);
-app.use('/api/attendees', attendeeRoutes);
-app.use('/api/budget', budgetRoutes);
-app.use('/api/feedback', feedbackRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/register', registrationRoutes);
+app.use('/api/events',       eventRoutes);
+app.use('/api/attendees',    attendeeRoutes);
+app.use('/api/budget',       budgetRoutes);
+app.use('/api/feedback',     feedbackRoutes);
+app.use('/api/analytics',    analyticsRoutes);
+app.use('/api/register',     registrationRoutes);
+app.use('/api/scan',         scanRoutes);
 
-// Socket.io - real time connection
+/*
+|--------------------------------------------------------------------------
+| HEALTH CHECK
+|--------------------------------------------------------------------------
+*/
+app.get('/health', async (req, res) => {
+  try {
+    await db.query('SELECT 1');
+    res.status(200).json({
+      success: true,
+      message: 'Server is running',
+      database: 'Connected'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Database connection failed'
+    });
+  }
+});
+
+/*
+|--------------------------------------------------------------------------
+| SOCKET.IO
+|--------------------------------------------------------------------------
+*/
 io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
-
+  console.log('User connected:', socket.id);
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
   });
 });
 
-// Make io accessible everywhere in the app
-app.set('io', io);
-
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+/*
+|--------------------------------------------------------------------------
+| API 404 — catch unknown API routes before frontend fallback
+|--------------------------------------------------------------------------
+*/
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'API route not found'
+  });
 });
 
-// Serve static frontend
-app.use(express.static(path.join(__dirname, 'public')));
-
-// For any non‑API request, send index.html (for client‑side routing if you add it later)
-app.get(/.*/, (req, res) => {
+/*
+|--------------------------------------------------------------------------
+| FRONTEND FALLBACK — serve index.html for all non-API routes
+|--------------------------------------------------------------------------
+*/
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+/*
+|--------------------------------------------------------------------------
+| GLOBAL ERROR HANDLER
+|--------------------------------------------------------------------------
+*/
+app.use((err, req, res, next) => {
+  console.error('Global error:', err);
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error'
+  });
+});
+
+/*
+|--------------------------------------------------------------------------
+| START SERVER
+|--------------------------------------------------------------------------
+*/
+const PORT = process.env.PORT || 3000;
+
+server.listen(PORT, () => {
+  console.log(`
+==================================
+ EVENTFLOW SERVER RUNNING
+ PORT     : ${PORT}
+ Dashboard: http://localhost:${PORT}
+ Health   : http://localhost:${PORT}/health
+==================================
+  `);
+});
+
+/*
+|--------------------------------------------------------------------------
+| PROCESS ERROR HANDLERS
+|--------------------------------------------------------------------------
+*/
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Rejection:', err);
 });
