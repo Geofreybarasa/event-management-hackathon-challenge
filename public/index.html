@@ -103,72 +103,141 @@
   <!-- END ① DASHBOARD -->
 
   <!-- ② EVENTS PAGE -->
-  <div class="page" id="page-events">
-    <div class="section">
-      <div class="section-header">
-        <div class="section-title">All Events</div>
-        <button class="btn btn-primary" onclick="openModal('modal-create-event')">+ New Event</button>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Event Name</th>
-            <th>Type</th>
-            <th>Date</th>
-            <th>Location</th>
-            <th>Budget</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="events-list">
-          <tr><td colspan="6"><div class="empty"><div class="loading"></div></div></td></tr>
-        </tbody>
-      </table>
+<!-- ② EVENTS PAGE -->
+<div class="page" id="page-events">
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">All Events</div>
+      <button class="btn btn-primary" onclick="openModal('modal-create-event')">+ New Event</button>
     </div>
+
+    <!-- SEARCH AND FILTER BAR -->
+    <div style="padding:16px 24px; display:flex; gap:12px; align-items:center; border-bottom:1px solid var(--border);">
+      <div style="position:relative; flex:1; max-width:320px;">
+        <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:14px;">🔍</span>
+        <input
+          type="text"
+          id="event-search"
+          placeholder="Search events..."
+          oninput="searchEvents()"
+          style="width:100%; padding:9px 12px 9px 34px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:var(--font-body); font-size:14px; outline:none;"
+        />
+      </div>
+      <select
+        id="event-type-filter"
+        onchange="searchEvents()"
+        style="padding:9px 14px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:var(--font-body); font-size:14px; outline:none; cursor:pointer;"
+      >
+        <option value="all">All Types</option>
+        <option value="External">External</option>
+        <option value="Internal">Internal</option>
+        <option value="Marketing">Marketing</option>
+        <option value="Technical">Technical</option>
+      </select>
+      <button
+        class="btn btn-ghost"
+        onclick="clearEventFilters()"
+        style="white-space:nowrap; font-size:13px;"
+      >
+        ✕ Clear
+      </button>
+      <span id="event-results-count" style="font-size:12px; color:var(--muted); white-space:nowrap;"></span>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Event Name</th>
+          <th>Type</th>
+          <th>Date</th>
+          <th>Location</th>
+          <th>Budget</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="events-list">
+        <tr><td colspan="6"><div class="empty"><div class="loading"></div></div></td></tr>
+      </tbody>
+    </table>
   </div>
+</div>
   <!-- END ② EVENTS -->
 
   <!-- ③ ATTENDEES PAGE -->
-  <div class="page" id="page-attendees">
-    <div class="section" style="margin-bottom:16px">
-      <div class="section-header">
-        <div class="section-title">Filter by Event</div>
-      </div>
-      <div style="padding:16px 24px; display:flex; gap:12px; align-items:center;">
-        <select id="attendee-event-select" style="flex:1; max-width:300px" onchange="loadAttendees()">
-          <option value="">Select an event...</option>
-        </select>
-        <button class="btn btn-primary" onclick="openRegisterModal()">+ Register Attendee</button>
-      </div>
+<!-- ③ ATTENDEES PAGE -->
+<div class="page" id="page-attendees">
+  <div class="section" style="margin-bottom:16px">
+    <div class="section-header">
+      <div class="section-title">Filter by Event</div>
     </div>
-    <div class="section">
-      <div class="section-header">
-        <div class="section-title">Attendees</div>
-        <div style="display:flex;gap:16px;font-size:13px;color:var(--muted)">
-          <span>Registered: <strong id="att-registered" style="color:var(--text)">0</strong></span>
-          <span>Checked In: <strong id="att-checkedin" style="color:var(--accent3)">0</strong></span>
-        </div>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Status</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody id="attendees-list">
-          <tr><td colspan="4">
-            <div class="empty">
-              <div class="empty-icon">👥</div>
-              <p>Select an event to view attendees</p>
-            </div>
-          </td></tr>
-        </tbody>
-      </table>
+    <div style="padding:16px 24px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+      <select id="attendee-event-select" style="flex:1; max-width:260px" onchange="clearAttendeeFilters()">
+        <option value="">Select an event...</option>
+      </select>
+      <button class="btn btn-primary" onclick="openRegisterModal()">+ Register Attendee</button>
     </div>
   </div>
+
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Attendees</div>
+      <div style="display:flex;gap:16px;font-size:13px;color:var(--muted)">
+        <span>Registered: <strong id="att-registered" style="color:var(--text)">0</strong></span>
+        <span>Checked In: <strong id="att-checkedin" style="color:var(--accent3)">0</strong></span>
+      </div>
+    </div>
+
+    <!-- SEARCH AND FILTER BAR -->
+    <div style="padding:16px 24px; display:flex; gap:12px; align-items:center; border-bottom:1px solid var(--border); flex-wrap:wrap;">
+      <div style="position:relative; flex:1; max-width:320px;">
+        <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:14px;">🔍</span>
+        <input
+          type="text"
+          id="attendee-search"
+          placeholder="Search by name or email..."
+          oninput="searchAttendees()"
+          style="width:100%; padding:9px 12px 9px 34px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:var(--font-body); font-size:14px; outline:none;"
+        />
+      </div>
+      <select
+        id="attendee-status-filter"
+        onchange="searchAttendees()"
+        style="padding:9px 14px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:var(--font-body); font-size:14px; outline:none; cursor:pointer;"
+      >
+        <option value="all">All Attendees</option>
+        <option value="registered">Not Checked In</option>
+        <option value="checked">Checked In</option>
+      </select>
+      <button
+        class="btn btn-ghost"
+        onclick="clearAttendeeFilters()"
+        style="font-size:13px;"
+      >
+        ✕ Clear
+      </button>
+      <span id="attendee-results-count" style="font-size:12px; color:var(--muted); white-space:nowrap;"></span>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="attendees-list">
+        <tr><td colspan="4">
+          <div class="empty">
+            <div class="empty-icon">👥</div>
+            <p>Select an event to view attendees</p>
+          </div>
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
   <!-- END ③ ATTENDEES -->
 
   <!-- ④ BUDGET PAGE -->

@@ -37,9 +37,27 @@ const createEvent = async (req, res) => {
 // Get all events
 const getAllEvents = async (req, res) => {
   try {
-    const [events] = await db.query(
-      'SELECT * FROM events ORDER BY created_at DESC'
-    );
+    const { search, type } = req.query;
+
+    // build query dynamically based on filters
+    let query = 'SELECT * FROM events WHERE 1=1';
+    const params = [];
+
+    // search by name
+    if (search) {
+      query += ' AND name LIKE ?';
+      params.push(`%${search}%`);
+    }
+
+    // filter by type
+    if (type && type !== 'all') {
+      query += ' AND type = ?';
+      params.push(type);
+    }
+
+    query += ' ORDER BY created_at DESC';
+
+    const [events] = await db.query(query, params);
 
     res.status(200).json({
       count: events.length,

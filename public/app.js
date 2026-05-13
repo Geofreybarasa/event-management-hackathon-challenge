@@ -105,13 +105,36 @@ async function loadDashboard() {
 // ── EVENTS ──
 async function loadEvents() {
   try {
-    const data = await api('GET', '/events');
+    const search = document.getElementById('event-search')?.value || '';
+    const type = document.getElementById('event-type-filter')?.value || 'all';
+
+    // build query string
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (type !== 'all') params.append('type', type);
+
+    const data = await api('GET', `/events?${params.toString()}`);
     allEvents = data.events || [];
+
+    // update results count
+    const countEl = document.getElementById('event-results-count');
+    if (countEl) {
+      countEl.textContent = search || type !== 'all'
+        ? `${data.count} result${data.count !== 1 ? 's' : ''} found`
+        : '';
+    }
+
     const tbody = document.getElementById('events-list');
     tbody.innerHTML = '';
 
     if (!allEvents.length) {
-      tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-icon">📅</div><p>No events yet</p></div></td></tr>`;
+      tbody.innerHTML = `
+        <tr><td colspan="6">
+          <div class="empty">
+            <div class="empty-icon">🔍</div>
+            <p>${search ? `No events found for "${search}"` : 'No events yet'}</p>
+          </div>
+        </td></tr>`;
       return;
     }
 
@@ -125,9 +148,9 @@ async function loadEvents() {
           <td>KES ${fmt(ev.planned_budget || 0)}</td>
           <td>
             <div class="actions">
+              <button class="btn btn-ghost" onclick="copyRegLink('${ev.registration_token}')">🔗 Link</button>
               <button class="btn btn-ghost" onclick="openEditModal(${ev.id}, '${ev.name}', '${ev.type}', '${ev.date.split('T')[0]}', '${ev.location || ''}', ${ev.planned_budget || 0})">Edit</button>
               <button class="btn btn-danger" onclick="deleteEvent(${ev.id})">Delete</button>
-              <button class="btn btn-ghost" onclick="copyRegLink('${ev.registration_token}')">🔗 Copy Link</button>
             </div>
           </td>
         </tr>`;
@@ -215,15 +238,41 @@ async function loadAttendeeEvents() {
 async function loadAttendees() {
   const eventId = document.getElementById('attendee-event-select').value;
   if (!eventId) return;
+
   try {
-    const data = await api('GET', `/attendees/event/${eventId}`);
+    const search = document.getElementById('attendee-search')?.value || '';
+    const status = document.getElementById('attendee-status-filter')?.value || 'all';
+
+    // build query string
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (status !== 'all') params.append('status', status);
+
+    const data = await api('GET', `/attendees/event/${eventId}?${params.toString()}`);
+
+    // update counts
     document.getElementById('att-registered').textContent = data.totalRegistered || 0;
-    document.getElementById('att-checkedin').textContent = data.totalCheckedIn || 0;
+    document.getElementById('att-checkedin').textContent  = data.totalCheckedIn || 0;
+
+    // update results count
+    const countEl = document.getElementById('attendee-results-count');
+    if (countEl) {
+      countEl.textContent = search || status !== 'all'
+        ? `${data.filtered} result${data.filtered !== 1 ? 's' : ''} found`
+        : '';
+    }
+
     const tbody = document.getElementById('attendees-list');
     tbody.innerHTML = '';
 
     if (!data.attendees || !data.attendees.length) {
-      tbody.innerHTML = `<tr><td colspan="4"><div class="empty"><div class="empty-icon">👥</div><p>No attendees yet</p></div></td></tr>`;
+      tbody.innerHTML = `
+        <tr><td colspan="4">
+          <div class="empty">
+            <div class="empty-icon">🔍</div>
+            <p>${search ? `No attendees found for "${search}"` : 'No attendees yet'}</p>
+          </div>
+        </td></tr>`;
       return;
     }
 
@@ -233,7 +282,11 @@ async function loadAttendees() {
         <tr>
           <td><strong>${att.name}</strong></td>
           <td>${att.email}</td>
-          <td><span class="badge ${checked ? 'badge-checked' : 'badge-pending'}">${checked ? 'Checked In' : 'Registered'}</span></td>
+          <td>
+            <span class="badge ${checked ? 'badge-checked' : 'badge-pending'}">
+              ${checked ? 'Checked In' : 'Registered'}
+            </span>
+          </td>
           <td>
             ${!checked
               ? `<button class="btn btn-success" onclick="checkIn(${att.id})">Check In</button>`
@@ -720,6 +773,39 @@ function copyRegLink(token) {
   const link = `${window.location.origin}/register/${token}`;
   navigator.clipboard.writeText(link);
   toast('Registration link copied! 🔗');
+}
+
+// ── EVENT SEARCH ──
+// debounce prevents calling API on every single keystroke
+let eventSearchTimer = null;
+function searchEvents() {
+  clearTimeout(eventSearchTimer);
+  eventSearchTimer = setTimeout(() => {
+    loadEvents();
+  }, 300); // wait 300ms after user stops typing
+}
+
+function clearEventFilters() {
+  document.getElementById('event-search').value = '';
+  document.getElementById('event-type-filter').value = 'all';
+  document.getElementById('event-results-count').textContent = '';
+  loadEvents();
+}
+
+// ── ATTENDEE SEARCH ──
+let attendeeSearchTimer = null;
+function searchAttendees() {
+  clearTimeout(attendeeSearchTimer);
+  attendeeSearchTimer = setTimeout(() => {
+    loadAttendees();
+  }, 300);
+}
+
+function clearAttendeeFilters() {
+  document.getElementById('attendee-search').value = '';
+  document.getElementById('attendee-status-filter').value = 'all';
+  document.getElementById('attendee-results-count').textContent = '';
+  loadAttendees();
 }
 
 // ── INIT ──

@@ -220,27 +220,43 @@ const registerAttendee = async (req, res) => {
 const getEventAttendees = async (req, res) => {
   try {
     const { eventId } = req.params;
+    const { search, status } = req.query;
 
-    // no need to check event exists - checkEventExists middleware already did this
-    // req.event is already attached by middleware
+    // build query dynamically
+    let query = 'SELECT * FROM attendees WHERE event_id = ?';
+    const params = [eventId];
 
-    // Get all attendees for this event
-    const [attendees] = await db.query(
-      'SELECT * FROM attendees WHERE event_id = ?',
-      [eventId]
-    );
+    // search by name or email
+    if (search) {
+      query += ' AND (name LIKE ? OR email LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
 
-    // Get checked in count
+    // filter by check-in status
+    if (status === 'checked') {
+      query += ' AND checked_in = true';
+    } else if (status === 'registered') {
+      query += ' AND checked_in = false';
+    }
+
+    const [attendees] = await db.query(query, params);
+
+    // get total counts regardless of filter
     const [checkedIn] = await db.query(
       'SELECT COUNT(*) as total FROM attendees WHERE event_id = ? AND checked_in = true',
       [eventId]
     );
 
+    const [total] = await db.query(
+      'SELECT COUNT(*) as total FROM attendees WHERE event_id = ?',
+      [eventId]
+    );
+
     res.status(200).json({
-      // use req.event.name instead of querying again - middleware already fetched it
       event: req.event.name,
-      totalRegistered: attendees.length,
+      totalRegistered: total[0].total,
       totalCheckedIn: checkedIn[0].total,
+      filtered: attendees.length,
       attendees: attendees
     });
 
