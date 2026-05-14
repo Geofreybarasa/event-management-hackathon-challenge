@@ -27,6 +27,8 @@ app.use(express.urlencoded({ extended: true }));
 |--------------------------------------------------------------------------
 */
 app.set('io', io);
+// make io globally available for mpesa callback
+global.io = io;
 
 /*
 |--------------------------------------------------------------------------
@@ -56,6 +58,8 @@ const feedbackRoutes     = require('./routes/feedback');
 const analyticsRoutes    = require('./routes/analyticsRoutes');
 const registrationRoutes = require('./routes/registration');
 const scanRoutes         = require('./routes/scan');
+const ticketRoutes = require('./routes/tickets');
+const mpesaRoutes  = require('./routes/mpesa');
 
 app.use('/api/events',       eventRoutes);
 app.use('/api/attendees',    attendeeRoutes);
@@ -64,6 +68,8 @@ app.use('/api/feedback',     feedbackRoutes);
 app.use('/api/analytics',    analyticsRoutes);
 app.use('/api/register',     registrationRoutes);
 app.use('/api/scan',         scanRoutes);
+app.use('/api/tickets', ticketRoutes);
+app.use('/api/mpesa',   mpesaRoutes);
 
 /*
 |--------------------------------------------------------------------------
@@ -108,6 +114,24 @@ app.use('/api', (req, res) => {
     success: false,
     message: 'API route not found'
   });
+});
+
+
+// TEMPORARY TEST ROUTE - remove after testing
+app.get('/test-mpesa', async (req, res) => {
+  try {
+    const { getAccessToken } = require('./config/mpesa');
+    const token = await getAccessToken();
+    res.json({ 
+      success: true, 
+      token: token.substring(0, 20) + '...' // show partial token
+    });
+  } catch(error) {
+    res.json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
 });
 
 /*
