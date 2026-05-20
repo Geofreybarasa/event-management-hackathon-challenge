@@ -27,28 +27,11 @@ app.use(express.urlencoded({ extended: true }));
 |--------------------------------------------------------------------------
 */
 app.set('io', io);
-// make io globally available for mpesa callback
 global.io = io;
 
 /*
 |--------------------------------------------------------------------------
-| STATIC FILES — must come before routes that serve HTML
-|--------------------------------------------------------------------------
-*/
-app.use(express.static(path.join(__dirname, 'public')));
-
-/*
-|--------------------------------------------------------------------------
-| REGISTRATION PAGE
-|--------------------------------------------------------------------------
-*/
-app.get('/register/:token', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'register.html'));
-});
-
-/*
-|--------------------------------------------------------------------------
-| API ROUTES
+| API ROUTES — must be registered BEFORE static files
 |--------------------------------------------------------------------------
 */
 const eventRoutes        = require('./routes/events');
@@ -58,8 +41,8 @@ const feedbackRoutes     = require('./routes/feedback');
 const analyticsRoutes    = require('./routes/analyticsRoutes');
 const registrationRoutes = require('./routes/registration');
 const scanRoutes         = require('./routes/scan');
-const ticketRoutes = require('./routes/tickets');
-const mpesaRoutes  = require('./routes/mpesa');
+const ticketRoutes       = require('./routes/tickets');
+const mpesaRoutes        = require('./routes/mpesa');
 
 app.use('/api/events',       eventRoutes);
 app.use('/api/attendees',    attendeeRoutes);
@@ -68,8 +51,8 @@ app.use('/api/feedback',     feedbackRoutes);
 app.use('/api/analytics',    analyticsRoutes);
 app.use('/api/register',     registrationRoutes);
 app.use('/api/scan',         scanRoutes);
-app.use('/api/tickets', ticketRoutes);
-app.use('/api/mpesa',   mpesaRoutes);
+app.use('/api/tickets',      ticketRoutes);
+app.use('/api/mpesa',        mpesaRoutes);
 
 /*
 |--------------------------------------------------------------------------
@@ -94,6 +77,25 @@ app.get('/health', async (req, res) => {
 
 /*
 |--------------------------------------------------------------------------
+| TEST MPESA — remove after testing
+|--------------------------------------------------------------------------
+*/
+app.get('/test-mpesa', async (req, res) => {
+  try {
+    const mpesa = require('./config/mpesa');
+    const token = await mpesa.getAccessToken();
+    res.json({
+      success: true,
+      exports: Object.keys(mpesa),
+      token: token.substring(0, 20) + '...'
+    });
+  } catch(error) {
+    res.json({ success: false, error: error.message });
+  }
+});
+
+/*
+|--------------------------------------------------------------------------
 | SOCKET.IO
 |--------------------------------------------------------------------------
 */
@@ -106,7 +108,7 @@ io.on('connection', (socket) => {
 
 /*
 |--------------------------------------------------------------------------
-| API 404 — catch unknown API routes before frontend fallback
+| API 404
 |--------------------------------------------------------------------------
 */
 app.use('/api', (req, res) => {
@@ -116,27 +118,25 @@ app.use('/api', (req, res) => {
   });
 });
 
-
-// TEMPORARY TEST ROUTE - remove after testing
-app.get('/test-mpesa', async (req, res) => {
-  try {
-    const { getAccessToken } = require('./config/mpesa');
-    const token = await getAccessToken();
-    res.json({ 
-      success: true, 
-      token: token.substring(0, 20) + '...' // show partial token
-    });
-  } catch(error) {
-    res.json({ 
-      success: false, 
-      error: error.message 
-    });
-  }
+/*
+|--------------------------------------------------------------------------
+| REGISTRATION PAGE — comes after API routes
+|--------------------------------------------------------------------------
+*/
+app.get('/register/:token', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'register.html'));
 });
 
 /*
 |--------------------------------------------------------------------------
-| FRONTEND FALLBACK — serve index.html for all non-API routes
+| STATIC FILES — must come AFTER API routes
+|--------------------------------------------------------------------------
+*/
+app.use(express.static(path.join(__dirname, 'public')));
+
+/*
+|--------------------------------------------------------------------------
+| FRONTEND FALLBACK
 |--------------------------------------------------------------------------
 */
 app.use((req, res) => {

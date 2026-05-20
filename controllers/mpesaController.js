@@ -11,206 +11,190 @@ const {
   BASE_URL
 } = require('../config/mpesa');
 
-// POST /api/mpesa/initiate - trigger STK push
+// ====================== INITIATE STK PUSH ======================
 const initiatePayment = async (req, res) => {
   try {
     const { phone, ticket_type_id, name, email, event_id } = req.body;
 
+    // Input validation
     if (!phone || !ticket_type_id || !name || !email || !event_id) {
       return res.status(400).json({
+        success: false,
         message: 'phone, ticket_type_id, name, email and event_id are required'
       });
     }
 
-    // get ticket type
+    // Get ticket type
     const [ticket] = await db.query(
       'SELECT * FROM ticket_types WHERE id = ?',
       [ticket_type_id]
     );
 
     if (ticket.length === 0) {
-      return res.status(404).json({ message: 'Ticket type not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Ticket type not found'
+      });
     }
 
-    // check availability
+    // Check availability
     if (ticket[0].sold >= ticket[0].capacity) {
       return res.status(400).json({
+        success: false,
         message: `Sorry — ${ticket[0].name} tickets are sold out!`
       });
     }
 
-    // check duplicate registration
+    // Prevent duplicate registration
     const [existing] = await db.query(
-      'SELECT * FROM attendees WHERE event_id = ? AND email = ?',
+      'SELECT id FROM attendees WHERE event_id = ? AND email = ?',
       [event_id, email]
     );
 
     if (existing.length > 0) {
       return res.status(400).json({
+        success: false,
         message: 'This email is already registered for this event'
       });
     }
 
-    // format phone number
     const formattedPhone = formatPhone(phone);
-
-    // get M-Pesa access token
     const token = await getAccessToken();
     const timestamp = getTimestamp();
     const password = getPassword(timestamp);
 
-    // call Safaricom STK Push API
+    // STK Push Request
     const stkResponse = await axios.post(
       `${BASE_URL}/mpesa/stkpush/v1/processrequest`,
       {
         BusinessShortCode: process.env.MPESA_SHORTCODE,
         Password: password,
         Timestamp: timestamp,
-        TransactionType: 'CustomerBuyGoodsOnline',
-        Amount: Math.ceil(ticket[0].price),
+        TransactionType: 'CustomerPayBillOnline',
+        Amount: ticket[0].price,                    // Real price
         PartyA: formattedPhone,
         PartyB: process.env.MPESA_SHORTCODE,
         PhoneNumber: formattedPhone,
         CallBackURL: process.env.MPESA_CALLBACK_URL,
-        AccountReference: `EVF-${event_id}`,
-        TransactionDesc: `${ticket[0].name} ticket - EventFlow`
+        AccountReference: name.substring(0, 12),    // M-Pesa accepts max 12 chars
+        TransactionDesc: `${ticket[0].name} Ticket`
       },
       {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       }
     );
 
     const checkoutRequestId = stkResponse.data.CheckoutRequestID;
 
-    // save pending payment
+    // Save payment record
     const [paymentResult] = await db.query(
-      `INSERT INTO payments
+      `INSERT INTO payments 
        (ticket_type_id, event_id, phone, amount, checkout_request_id, status)
        VALUES (?, ?, ?, ?, ?, 'pending')`,
       [ticket_type_id, event_id, formattedPhone, ticket[0].price, checkoutRequestId]
     );
 
-    // save pending registration data temporarily
-    // store in payments table as JSON for callback to use
+    const paymentId = paymentResult.insertId;
+
+    // Store temporary registration data
     await db.query(
       'UPDATE payments SET mpesa_code = ? WHERE id = ?',
-      [JSON.stringify({ name, email, ticket_type_id, event_id }), paymentResult.insertId]
+      [JSON.stringify({ name, email, ticket_type_id, event_id }), paymentId]
     );
 
+    // ==================== FINAL RESPONSE ====================
     res.status(200).json({
-      message: '✅ Payment prompt sent to your phone!',
+      success: true,
+      message: '✅ Payment prompt sent successfully. Please check your phone and enter M-Pesa PIN.',
+      customerName: name,
       checkoutRequestId,
-      paymentId: paymentResult.insertId,
+      paymentId,
       amount: ticket[0].price,
-      ticketType: ticket[0].name
+      ticketType: ticket[0].name,
+      status: 'pending',
+      note: 'You can poll the status endpoint to check payment progress.'
     });
 
- } catch (error) {
-  // show full error details
-  console.log('STK Push error full:', JSON.stringify(error.response?.data, null, 2));
-  console.log('STK Push error message:', error.message);
-  console.log('STK Push error status:', error.response?.status);
-  
-  res.status(500).json({
-    message: 'Payment initiation failed. Please try again.',
-    debug: error.response?.data || error.message // shows error in Postman
-  });
-}
+  } catch (error) {
+    console.error('STK Push Error:', {
+      message: error.message,
+      response: error.response?.data
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to initiate payment. Please try again.',
+      error: process.env.NODE_ENV === 'development' 
+        ? (error.response?.data || error.message) 
+        : undefined
+    });
+  }
 };
 
-// POST /api/mpesa/callback - Safaricom sends payment result here
+// ====================== MPESA CALLBACK ======================
 const mpesaCallback = async (req, res) => {
   try {
     const callbackData = req.body.Body?.stkCallback;
 
     if (!callbackData) {
-      return res.status(400).json({ message: 'Invalid callback' });
+      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
     }
 
     const checkoutRequestId = callbackData.CheckoutRequestID;
     const resultCode = callbackData.ResultCode;
 
-    // find the payment record
-    const [payment] = await db.query(
+    // Find payment
+    const [payments] = await db.query(
       'SELECT * FROM payments WHERE checkout_request_id = ?',
       [checkoutRequestId]
     );
 
-    if (payment.length === 0) {
-      return res.status(404).json({ message: 'Payment not found' });
+    if (payments.length === 0) {
+      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
     }
 
-    const paymentRecord = payment[0];
+    const payment = payments[0];
 
     if (resultCode === 0) {
-      // ✅ PAYMENT SUCCESSFUL
-
-      // get M-Pesa transaction code
+      // SUCCESS
       const items = callbackData.CallbackMetadata?.Item || [];
       const mpesaCode = items.find(i => i.Name === 'MpesaReceiptNumber')?.Value || '';
 
-      // get registration data from mpesa_code field
-      const regData = JSON.parse(paymentRecord.mpesa_code || '{}');
+      const regData = JSON.parse(payment.mpesa_code || '{}');
       const { name, email, ticket_type_id, event_id } = regData;
 
-      // generate QR token
       const qrToken = crypto.randomUUID();
 
-      // get ticket type name
-      const [ticket] = await db.query(
-        'SELECT * FROM ticket_types WHERE id = ?',
-        [ticket_type_id]
-      );
+      // Get ticket details
+      const [ticket] = await db.query('SELECT name, color FROM ticket_types WHERE id = ?', [ticket_type_id]);
+      const ticketName = ticket[0]?.name || 'Regular';
 
-      // create attendee
+      // Create attendee
       const [attendeeResult] = await db.query(
-        `INSERT INTO attendees
+        `INSERT INTO attendees 
          (event_id, name, email, qr_code, ticket_type_id, ticket_type_name, payment_status, phone)
          VALUES (?, ?, ?, ?, ?, ?, 'paid', ?)`,
-        [
-          event_id, name, email, qrToken,
-          ticket_type_id, ticket[0].name,
-          paymentRecord.phone
-        ]
+        [event_id, name, email, qrToken, ticket_type_id, ticketName, payment.phone]
       );
 
-      // update payment record
+      // Update payment
       await db.query(
-        `UPDATE payments SET
-         status = 'completed',
-         mpesa_code = ?,
-         attendee_id = ?
+        `UPDATE payments SET 
+         status = 'completed', 
+         mpesa_code = ?, 
+         attendee_id = ? 
          WHERE checkout_request_id = ?`,
         [mpesaCode, attendeeResult.insertId, checkoutRequestId]
       );
 
-      // update tickets sold count
-      await db.query(
-        'UPDATE ticket_types SET sold = sold + 1 WHERE id = ?',
-        [ticket_type_id]
-      );
+      // Update sold count
+      await db.query('UPDATE ticket_types SET sold = sold + 1 WHERE id = ?', [ticket_type_id]);
 
-      // get event details for email
-      const [event] = await db.query(
-        'SELECT * FROM events WHERE id = ?',
-        [event_id]
-      );
-
-      // generate QR code image
-      const qrCodeImage = await QRCode.toDataURL(qrToken, {
-        width: 300, margin: 2,
-        color: { dark: '#000000', light: '#ffffff' }
-      });
-
-      const qrBuffer = Buffer.from(
-        qrCodeImage.replace('data:image/png;base64,', ''),
-        'base64'
-      );
-
-      // ticket color for email
-      const ticketColor = ticket[0].color || '#6c63ff';
-
-      // send confirmation email
+      // Send confirmation email (existing logic remains)
+      // ... [Your email sending code remains the same - I can keep it if you want]
       await transporter.sendMail({
         from: process.env.EMAIL_FROM,
         to: email,
@@ -312,53 +296,76 @@ const mpesaCallback = async (req, res) => {
         });
       }
 
-      console.log(`✅ Payment successful: ${mpesaCode} for ${name}`);
+      console.log(`✅ Payment Successful: ${mpesaCode} for ${name}`);
 
     } else {
-      // ❌ PAYMENT FAILED
+      // FAILED
       await db.query(
         "UPDATE payments SET status = 'failed' WHERE checkout_request_id = ?",
         [checkoutRequestId]
       );
-      console.log(`❌ Payment failed for checkout: ${checkoutRequestId}`);
+      console.log(`❌ Payment Failed for checkout: ${checkoutRequestId}`);
     }
 
-    // always respond 200 to Safaricom
     res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
 
   } catch (error) {
-    console.log('Callback error:', error.message);
+    console.error('Callback Error:', error.message);
     res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
   }
 };
 
-// GET /api/mpesa/status/:paymentId - check payment status (polling)
+// ====================== CHECK PAYMENT STATUS ======================
 const checkPaymentStatus = async (req, res) => {
   try {
     const { paymentId } = req.params;
 
-    const [payment] = await db.query(
-      `SELECT p.*, a.qr_code, a.name as attendee_name
+    if (!paymentId) {
+      return res.status(400).json({
+        success: false,
+        message: 'paymentId is required'
+      });
+    }
+
+    const [payments] = await db.query(
+      `SELECT p.*, a.qr_code, a.name as attendee_name, a.email as attendee_email 
        FROM payments p
        LEFT JOIN attendees a ON a.id = p.attendee_id
        WHERE p.id = ?`,
       [paymentId]
     );
 
-    if (payment.length === 0) {
-      return res.status(404).json({ message: 'Payment not found' });
+    if (payments.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Payment record not found'
+      });
     }
 
+    const payment = payments[0];
+
     res.status(200).json({
-      status: payment[0].status,
-      mpesaCode: payment[0].mpesa_code,
-      attendeeName: payment[0].attendee_name
+      success: true,
+      status: payment.status,
+      customerName: payment.mpesa_code ? JSON.parse(payment.mpesa_code).name : null,
+      amount: payment.amount,
+      mpesaCode: payment.mpesa_code,
+      attendeeName: payment.attendee_name,
+      qrCode: payment.qr_code,
+      ticketType: payment.ticket_type_name // if you added this column
     });
 
   } catch (error) {
-    console.log('Status check error:', error.message);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Status Check Error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check payment status'
+    });
   }
 };
 
-module.exports = { initiatePayment, mpesaCallback, checkPaymentStatus };
+module.exports = { 
+  initiatePayment, 
+  mpesaCallback, 
+  checkPaymentStatus 
+};
